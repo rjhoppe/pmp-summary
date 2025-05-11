@@ -1,0 +1,8 @@
+services:
+  pmp-summary:
+    build: . # your image name here
+    container_name: pmp-summary
+    environment:
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY}
+      - WASTEBIN_URL=${WASTEBIN_URL}
+      - NTFY_URL=${NTFY_URL}
