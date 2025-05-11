@@ -1,6 +1,6 @@
 services:
   pmp-summary:
-    build: . # your image name here
+    image: rickjhoppe/pmp-summary:latest
     container_name: pmp-summary
     environment:
       - MISTRAL_API_KEY=${MISTRAL_API_KEY}
