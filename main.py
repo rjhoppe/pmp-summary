@@ -36,6 +36,7 @@ class PreMarketPrepSummarizer:
         print("Getting the most recent stream's video id...")
         search_json = YoutubeSearch(channel_name, max_results=max_results).to_json()
         search = json.loads(search_json)
+        print(search)
         for i in range(max_results):
             if search['videos'][i]['channel'] == channel_name:
                 print(search['videos'][i]['title'])
