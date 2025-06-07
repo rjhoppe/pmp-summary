@@ -36,12 +36,15 @@ class PreMarketPrepSummarizer:
         print("Getting the most recent stream's video id...")
         search_json = YoutubeSearch(channel_name, max_results=max_results).to_json()
         search = json.loads(search_json)
-        print(search)
         for i in range(max_results):
             if search['videos'][i]['channel'] == channel_name:
-                print(search['videos'][i]['title'])
-                print(search['videos'][i]['publish_time'])
+                print("--------------------------------")
+                print(f"Title: {search['videos'][i]['title']}")
+                print(f"Publish Time: {search['videos'][i]['publish_time']}")
+                print(f"ID: {search['videos'][i]['id']}")
+                print("--------------------------------")
                 return search['videos'][i]['id']
+        self.ping_error_ntfy(f"No video found for channel {channel_name}")
         raise ValueError(f"No video found for channel {channel_name}")
 
     def get_captions(self, video_id: str) -> str:
@@ -90,6 +93,39 @@ class PreMarketPrepSummarizer:
                 print(f"Error summarizing chunk: {e}")
                 summaries.append("")
         return summaries
+
+    def consolidate_summaries(self, summaries: List[str]) -> str:
+        """
+        Consolidate multiple chunk summaries into a single, well-organized final summary.
+        This removes redundancy while preserving unique information.
+        """
+        print("Consolidating summaries into final summary...")
+        combined_summaries = "\n\n".join([f"Section {i+1}:\n{summary}" for i, summary in enumerate(summaries) if summary.strip()])
+        
+        consolidation_prompt = f"""You are tasked with consolidating multiple summary sections from a financial trading show transcript into a single, well-organized final summary.
+
+INSTRUCTIONS:
+1. Combine all the information from the sections below into ONE comprehensive summary
+2. Remove duplicate information and redundant points
+3. Organize the content into logical sections with clear headings
+4. Preserve ALL unique information - do not omit any specific details, stock tickers, prices, or insights
+5. Use bullet points and clear formatting for readability
+6. Group related topics together (e.g., all stock discussions, market news, earnings, etc.)
+7. Maintain the chronological flow when relevant
+
+INPUT SECTIONS TO CONSOLIDATE:
+{combined_summaries}
+
+OUTPUT: A single, well-organized summary with clear headings and no redundant information."""
+
+        try:
+            request = [{"role": "user", "content": consolidation_prompt}]
+            response = self.client.chat.complete(model=self.model, messages=request)
+            return response.choices[0].message.content
+        except Exception as e:
+            print(f"Error consolidating summaries: {e}")
+            # Fallback to simple concatenation if consolidation fails
+            return "\n\n".join(summaries)
 
     def save_summary(self, summary: str, filename: str = "summary_output.txt") -> None:
         """
@@ -154,6 +190,21 @@ class PreMarketPrepSummarizer:
         """
         print("Pinging ntfy...")
         data = f"New PMP summary available here: {self.summary_url}"
+        headers = {"Tags": "rotating_light,pmp-summary,cron-job"}
+
+        try:
+            response = requests.post(default_ntfy_url, data=data, headers=headers)
+            response.raise_for_status()
+            print(f"Ntfy response: {response.text}")
+        except Exception as e:
+            print(f"Failed to ping ntfy: {e}")
+
+    def ping_error_ntfy(self, error: str) -> None:
+        """
+        Ping ntfy to with a job failed error message.
+        """
+        print("Pinging ntfy...")
+        data = f"PMP Summary job failed to run.Error: {error}"
         headers = {"Tags": "heavy_check_mark,pmp-summary,cron-job"}
 
         try:
@@ -171,26 +222,29 @@ class PreMarketPrepSummarizer:
         video_id = self.get_video_id()
 
         # Retry logic for captions
-        max_retries = 2
+        max_retries = 3  # Total number of attempts
         retry_delay = 1800  # 30 minutes in seconds
-        attempt = 0
         text = None
-        while attempt <= max_retries:
+        
+        for attempt in range(max_retries):
             try:
+                print(f"Attempting to get captions (attempt {attempt + 1}/{max_retries})...")
                 text = self.get_captions(video_id)
+                print("Successfully retrieved captions!")
                 break
             except Exception as e:
-                attempt += 1
-                if attempt > max_retries:
-                    print(f"Failed to get captions after {max_retries + 1} attempts: {e}")
+                print(f"Captions not available yet (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt + 1 < max_retries:  # Don't sleep on the last attempt
+                    print(f"Sleeping for {retry_delay // 60} minutes before retrying...")
+                    time.sleep(retry_delay)
+                else:
+                    print(f"Failed to get captions after {max_retries} attempts. Exiting.")
+                    self.ping_error_ntfy(f"Failed to get captions after {max_retries} attempts. Exiting.")
                     return
-                print(f"Captions not available yet (attempt {attempt}/{max_retries + 1}): {e}")
-                print(f"Sleeping for {retry_delay // 60} minutes before retrying...")
-                time.sleep(retry_delay)
 
         chunks = self.chunk_text(text)
         summaries = self.summarize_chunks(chunks)
-        final_summary = "\n".join(summaries)
+        final_summary = self.consolidate_summaries(summaries)
         self.send_to_wastebin(
             summary=final_summary,
             extension="txt",
