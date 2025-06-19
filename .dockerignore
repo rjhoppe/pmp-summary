@@ -1,0 +1,67 @@
+# Version Control
+.git
+.gitignore
+.github
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+
+# Virtual Environment
+.env
+.venv
+env/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Project specific
+test/
+tests/
+archive/
+*.log
+*.sqlite
+*.db
+
+# Docker
+Dockerfile
+docker-compose*.yml
+docker-compose*.yaml
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Development tools
+.pre-commit-config.yaml
+pytest.ini
+mypy.ini
+.pylintrc
+.flake8
+
+# Build and dist
+build/
+dist/
+*.egg-info/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
