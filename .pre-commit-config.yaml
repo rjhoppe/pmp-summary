@@ -16,7 +16,6 @@ repos:
     hooks:
       - id: ruff
       - id: ruff-format
-        exclude: data.py
   # Sort imports
   - repo: https://github.com/pycqa/isort
     rev: 5.13.2
@@ -28,4 +27,15 @@ repos:
     rev: v8.16.1
     hooks:
       - id: gitleaks
-  - repo: https://github.c
+
+    # Run pytest
+  - repo: local
+    hooks:
+      - id: run-pytest
+        name: Run pytest
+        entry: pytest
+        language: python
+        types: [python]
+        pass_filenames: false
+        additional_dependencies: [pytest]
+        stages: [commit]
